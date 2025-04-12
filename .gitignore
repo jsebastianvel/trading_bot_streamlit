@@ -1,0 +1,52 @@
+# Archivos y carpetas específicas que no queremos
+Fontawesome/
+Phona Website/
+cashmeup/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Entorno virtual
+venv/
+ENV/
+virtual_enviroment/
+
+# Archivos de configuración
+.env
+*.env
+.env.*
+!.env.example
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs y datos
+*.log
+*.csv
+*.sqlite
+*.db 

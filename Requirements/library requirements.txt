@@ -1,0 +1,11 @@
+pandas
+pandas-ta
+python-dotenv
+websocket-client
+ccxt
+matplotlib
+numpy
+requests
+python-telegram-bot
+streamlit
+plotly

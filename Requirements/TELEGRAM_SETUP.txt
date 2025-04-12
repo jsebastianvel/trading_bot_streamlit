@@ -1,0 +1,52 @@
+CONFIGURACIÓN DE TELEGRAM BOT
+========================
+
+1. CREAR UN BOT EN TELEGRAM
+--------------------------
+a) Abre Telegram y busca a @BotFather
+b) Envía el comando /newbot
+c) Sigue las instrucciones:
+   - Proporciona un nombre para tu bot
+   - Proporciona un username (debe terminar en 'bot')
+d) BotFather te dará un token. Guárdalo, se verá algo así:
+   123456789:ABCdefGHIjklmNOPQrstUVwxyz
+
+2. OBTENER EL CHAT ID
+--------------------
+Método 1 (Más fácil):
+a) Busca el bot @RawDataBot en Telegram
+b) Inicia una conversación con /start
+c) El bot te mostrará tu Chat ID en el campo "id"
+
+Método 2 (Alternativo):
+a) Inicia una conversación con tu bot
+b) Envíale cualquier mensaje
+c) Visita esta URL (reemplaza YOUR_BOT_TOKEN con tu token):
+   https://api.telegram.org/botYOUR_BOT_TOKEN/getUpdates
+d) Busca el número en "chat":{"id":ESTE_ES_TU_CHAT_ID}
+
+3. CONFIGURAR EL ARCHIVO .env
+---------------------------
+a) Abre el archivo .env
+b) Reemplaza los valores:
+   TELEGRAM_BOT_TOKEN=tu_token_aquí
+   TELEGRAM_CHAT_ID=tu_chat_id_aquí
+
+4. VERIFICAR LA CONFIGURACIÓN
+---------------------------
+a) El Chat ID debe ser un número (puede ser negativo)
+b) El Bot Token debe tener el formato: números:letras/números
+c) Asegúrate de no compartir estos datos con nadie
+
+5. PRUEBA DE FUNCIONAMIENTO
+-------------------------
+a) Ejecuta el bot
+b) Deberías recibir mensajes en tu chat de Telegram
+c) Si no recibes mensajes, verifica:
+   - Que hayas iniciado una conversación con el bot
+   - Que los datos en .env sean correctos
+   - Que tengas conexión a internet
+
+NOTA: Mantén tu Bot Token seguro y nunca lo compartas.
+Si crees que tu token ha sido comprometido, usa /revoke
+con @BotFather para obtener uno nuevo. 

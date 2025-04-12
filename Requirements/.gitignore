@@ -1,0 +1,78 @@
+# Archivos de entorno y configuración
+.env
+*.env
+.env.*
+!.env.example
+
+# Archivos de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Directorios virtuales
+venv/
+ENV/
+virtual_enviroment/
+
+# Archivos de IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de log y datos
+*.log
+*.csv
+*.json
+*.sqlite
+*.db
+
+# Excepciones
+!requirements.txt
+!config.py
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs y archivos temporales
+*.log
+temp/
+tmp/
+*.tmp
+
+# Archivos de configuración local
+config.local.py
+*.local.py
+
+# Resultados de backtesting
+trading_bot_results/ 
