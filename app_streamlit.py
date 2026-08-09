@@ -714,7 +714,7 @@ if selected_view == "📊 Backtesting":
                 color = 'green' if val > 0 else 'red'
                 return f'color: {color}'
             
-            styled_df = trades_df.style.applymap(color_pnl, subset=['pnl'])
+            styled_df = trades_df.style.map(color_pnl, subset=['pnl'])
             st.dataframe(styled_df)
         else:
             st.info("El backtesting no genero ninguna operacion en el periodo seleccionado.")
