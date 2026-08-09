@@ -49,12 +49,168 @@ st.set_page_config(
 )
 
 # Crear pestañas para diferentes secciones
-tab1, tab2 = st.tabs(["📊 Backtesting", "🤖 Trading en Vivo"])
+tab1, tab2, tab3 = st.tabs(["📊 Backtesting", "🤖 Trading en Vivo", "🧠 Agente IA"])
 
 # Inicializar el estado de la sesión para el trader en vivo si no existe
 if 'live_trader' not in st.session_state:
     st.session_state.live_trader = None
     st.session_state.is_trading = False
+
+with tab2:
+    st.title("🤖 Trading Bot - Trading en Vivo")
+    
+    # Sección de configuración
+    with st.sidebar:
+        st.header("Configuración de Trading")
+        
+        # Selección de exchange y par
+        exchange = st.selectbox(
+            "Exchange",
+            ["Binance"],
+            index=0
+        )
+        
+        symbol = st.selectbox(
+            "Par de Trading",
+            ["BTC/USDT", "ETH/USDT", "TAO/USDT"],
+            index=0
+        )
+        
+        # Configuración de API (oculta)
+        api_key = os.getenv('BINANCE_API_KEY', '')
+        api_secret = os.getenv('BINANCE_API_SECRET', '')
+        
+        if not api_key or not api_secret:
+            st.error("❌ No se encontraron las credenciales de API en las variables de entorno")
+    
+    if api_key and api_secret:
+        # Estado del bot y controles
+        col1, col2, col3 = st.columns(3)
+    
+        with col1:
+            if st.session_state.live_trader is None:
+                if st.button("🟢 Iniciar Bot"):
+                    try:
+                        # Inicializar exchange
+                        exchange_config = {
+                            'apiKey': api_key,
+                            'secret': api_secret,
+                            'enableRateLimit': True
+                        }
+                        exchange_client = ccxt.binance(exchange_config)
+                    
+                        # Crear instancia del trader
+                        st.session_state.live_trader = LiveTrader(
+                            exchange_client=exchange_client,
+                            symbol=symbol
+                        )
+                        st.session_state.live_trader.start()
+                        st.success("✅ Bot iniciado exitosamente")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error al iniciar el bot: {str(e)}")
+            else:
+                if st.button("🔴 Detener Bot"):
+                    try:
+                        st.session_state.live_trader.stop()
+                        st.session_state.live_trader = None
+                        st.session_state.is_trading = False
+                        st.success("✅ Bot detenido exitosamente")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Error al detener el bot: {str(e)}")
+    
+        with col2:
+            if st.session_state.live_trader is not None:
+                if not st.session_state.is_trading:
+                    if st.button("✅ Activar Trading"):
+                        st.session_state.live_trader.enable_trading()
+                        st.session_state.is_trading = True
+                        st.success("✅ Trading activado")
+                        st.rerun()
+                else:
+                    if st.button("⛔ Desactivar Trading"):
+                        st.session_state.live_trader.disable_trading()
+                        st.session_state.is_trading = False
+                        st.success("⛔ Trading desactivado")
+                        st.rerun()
+    
+        with col3:
+            # Estado actual
+            if st.session_state.live_trader is not None:
+                st.metric(
+                    "Estado del Bot",
+                    "🟢 Activo" if st.session_state.live_trader.is_running else "🔴 Detenido"
+                )
+                st.metric(
+                    "Trading Automático",
+                    "✅ Activado" if st.session_state.is_trading else "⛔ Desactivado"
+                )
+            else:
+                st.metric("Estado del Bot", "🔴 Detenido")
+                st.metric("Trading Automático", "⛔ Desactivado")
+    
+        # Información y advertencias
+        st.info("""
+        ℹ️ **Información del Trading en Vivo**
+        - El bot analiza el mercado cada minuto
+        - Las señales se generan según la estrategia MACD multi-timeframe
+        - El trading automático ejecutará operaciones solo cuando esté activado
+        - Todas las operaciones se notifican por Telegram
+        """)
+    
+        st.warning("""
+        ⚠️ **Advertencias**
+        - Asegúrate de tener suficiente saldo en tu cuenta
+        - El bot opera con un máximo del 5% del capital por operación
+        - Las operaciones automáticas pueden generar pérdidas
+        - Monitorea regularmente el rendimiento del bot
+        """)
+
+
+
+with tab3:
+    st.title("Agente IA - Analisis con RAG + LLM")
+    st.markdown(
+        """
+        Este agente combina la señal técnica MACD multi-temporalidad con noticias
+        recientes de cripto (recuperadas vía RAG) y usa un LLM (Gemini) para
+        generar una explicación en lenguaje natural y una recomendación final.
+        """
+    )
+
+    if st.button("Generar análisis del agente", type="primary"):
+        with st.spinner("Consultando precios, noticias y generando análisis..."):
+            try:
+                from genai.agent import generate_market_brief
+                st.session_state.agent_brief = generate_market_brief()
+                st.session_state.agent_error = None
+            except Exception as e:
+                st.session_state.agent_error = str(e)
+
+    if st.session_state.get("agent_error"):
+        st.error(f"Error generando el análisis: {st.session_state.agent_error}")
+
+    if st.session_state.get("agent_brief"):
+        brief = st.session_state.agent_brief
+
+        decision_icon = {"LONG": "🟢", "SHORT": "🔴", "WAIT": "🟡"}.get(brief["decision"], "")
+        st.metric("Recomendación", f"{decision_icon} {brief['decision']}")
+
+        col1, col2 = st.columns(2)
+        col1.metric("Peso Compra", f"{brief['peso_buy']:.2f}")
+        col2.metric("Peso Venta", f"{brief['peso_sell']:.2f}")
+
+        st.subheader("Market Brief (generado por IA)")
+        st.write(brief["explanation"])
+
+        with st.expander("Señales técnicas por temporalidad"):
+            for s in brief["signals"]:
+                st.text(s)
+
+        with st.expander(f"Noticias usadas para el contexto ({len(brief['news'])})"):
+            for n in brief["news"]:
+                st.markdown(f"- **[{n['source']}]** [{n['title']}]({n['link']})")
 
 with tab1:
     st.title("🤖 Trading Bot - Análisis de Backtesting")
@@ -578,113 +734,3 @@ with tab1:
     except Exception as e:
         st.error(f"Error al cargar los resultados: {e}")
 
-with tab2:
-    st.title("🤖 Trading Bot - Trading en Vivo")
-    
-    # Sección de configuración
-    with st.sidebar:
-        st.header("Configuración de Trading")
-        
-        # Selección de exchange y par
-        exchange = st.selectbox(
-            "Exchange",
-            ["Binance"],
-            index=0
-        )
-        
-        symbol = st.selectbox(
-            "Par de Trading",
-            ["BTC/USDT", "ETH/USDT", "TAO/USDT"],
-            index=0
-        )
-        
-        # Configuración de API (oculta)
-        api_key = os.getenv('BINANCE_API_KEY', '')
-        api_secret = os.getenv('BINANCE_API_SECRET', '')
-        
-        if not api_key or not api_secret:
-            st.error("❌ No se encontraron las credenciales de API en las variables de entorno")
-            st.stop()
-    
-    # Estado del bot y controles
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.session_state.live_trader is None:
-            if st.button("🟢 Iniciar Bot"):
-                try:
-                    # Inicializar exchange
-                    exchange_config = {
-                        'apiKey': api_key,
-                        'secret': api_secret,
-                        'enableRateLimit': True
-                    }
-                    exchange_client = ccxt.binance(exchange_config)
-                    
-                    # Crear instancia del trader
-                    st.session_state.live_trader = LiveTrader(
-                        exchange_client=exchange_client,
-                        symbol=symbol
-                    )
-                    st.session_state.live_trader.start()
-                    st.success("✅ Bot iniciado exitosamente")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Error al iniciar el bot: {str(e)}")
-        else:
-            if st.button("🔴 Detener Bot"):
-                try:
-                    st.session_state.live_trader.stop()
-                    st.session_state.live_trader = None
-                    st.session_state.is_trading = False
-                    st.success("✅ Bot detenido exitosamente")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Error al detener el bot: {str(e)}")
-    
-    with col2:
-        if st.session_state.live_trader is not None:
-            if not st.session_state.is_trading:
-                if st.button("✅ Activar Trading"):
-                    st.session_state.live_trader.enable_trading()
-                    st.session_state.is_trading = True
-                    st.success("✅ Trading activado")
-                    st.rerun()
-            else:
-                if st.button("⛔ Desactivar Trading"):
-                    st.session_state.live_trader.disable_trading()
-                    st.session_state.is_trading = False
-                    st.success("⛔ Trading desactivado")
-                    st.rerun()
-    
-    with col3:
-        # Estado actual
-        if st.session_state.live_trader is not None:
-            st.metric(
-                "Estado del Bot",
-                "🟢 Activo" if st.session_state.live_trader.is_running else "🔴 Detenido"
-            )
-            st.metric(
-                "Trading Automático",
-                "✅ Activado" if st.session_state.is_trading else "⛔ Desactivado"
-            )
-        else:
-            st.metric("Estado del Bot", "🔴 Detenido")
-            st.metric("Trading Automático", "⛔ Desactivado")
-    
-    # Información y advertencias
-    st.info("""
-    ℹ️ **Información del Trading en Vivo**
-    - El bot analiza el mercado cada minuto
-    - Las señales se generan según la estrategia MACD multi-timeframe
-    - El trading automático ejecutará operaciones solo cuando esté activado
-    - Todas las operaciones se notifican por Telegram
-    """)
-    
-    st.warning("""
-    ⚠️ **Advertencias**
-    - Asegúrate de tener suficiente saldo en tu cuenta
-    - El bot opera con un máximo del 5% del capital por operación
-    - Las operaciones automáticas pueden generar pérdidas
-    - Monitorea regularmente el rendimiento del bot
-    """) 
