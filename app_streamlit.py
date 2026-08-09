@@ -60,28 +60,27 @@ with tab2:
     st.title("🤖 Trading Bot - Trading en Vivo")
     
     # Sección de configuración
-    with st.sidebar:
-        st.header("Configuración de Trading")
-        
-        # Selección de exchange y par
-        exchange = st.selectbox(
-            "Exchange",
-            ["Binance"],
-            index=0
-        )
-        
-        symbol = st.selectbox(
-            "Par de Trading",
-            ["BTC/USDT", "ETH/USDT", "TAO/USDT"],
-            index=0
-        )
-        
-        # Configuración de API (oculta)
-        api_key = os.getenv('BINANCE_API_KEY', '')
-        api_secret = os.getenv('BINANCE_API_SECRET', '')
-        
-        if not api_key or not api_secret:
-            st.error("❌ No se encontraron las credenciales de API en las variables de entorno")
+    st.header("Configuración de Trading")
+    
+    # Selección de exchange y par
+    exchange = st.selectbox(
+        "Exchange",
+        ["Binance"],
+        index=0
+    )
+    
+    symbol = st.selectbox(
+        "Par de Trading",
+        ["BTC/USDT", "ETH/USDT", "TAO/USDT"],
+        index=0
+    )
+    
+    # Configuración de API (oculta)
+    api_key = os.getenv('BINANCE_API_KEY', '')
+    api_secret = os.getenv('BINANCE_API_SECRET', '')
+    
+    if not api_key or not api_secret:
+        st.error("❌ No se encontraron las credenciales de API en las variables de entorno")
     
     if api_key and api_secret:
         # Estado del bot y controles
@@ -216,17 +215,17 @@ with tab1:
     st.title("🤖 Trading Bot - Análisis de Backtesting")
 
     # Sidebar para configuración
-    st.sidebar.header("Configuración de Backtesting")
+    st.header("Configuración de Backtesting")
 
     # Parámetros de backtesting
-    symbol = st.sidebar.selectbox(
+    symbol = st.selectbox(
         "Par de Trading",
         ["BTC/USDT", "ETH/USDT", "TAO/USDT", "XRP/USDT", "SOL/USDT"],
         index=0
     )
 
     # Selección de fechas
-    col1, col2 = st.sidebar.columns(2)
+    col1, col2 = st.columns(2)
 
     with col1:
         start_date = st.date_input(
@@ -244,18 +243,18 @@ with tab1:
 
     # Validar que la fecha inicial sea anterior a la final
     if start_date >= end_date:
-        st.sidebar.error("❌ La fecha inicial debe ser anterior a la fecha final")
+        st.error("❌ La fecha inicial debe ser anterior a la fecha final")
         st.stop()
 
     # Selección de temporalidad (una sola opción)
-    selected_timeframe = st.sidebar.selectbox(
+    selected_timeframe = st.selectbox(
         "Temporalidad a analizar",
         list(TIMEFRAMES.keys()),
         index=None,
         help="Selecciona la temporalidad para el backtesting"
     )
 
-    initial_capital = st.sidebar.number_input(
+    initial_capital = st.number_input(
         "Capital Inicial ($)",
         min_value=100,
         max_value=100000,
@@ -264,11 +263,11 @@ with tab1:
     )
 
     # Botón para ejecutar backtesting
-    run_backtest_button = st.sidebar.button("Ejecutar Backtesting")
+    run_backtest_button = st.button("Ejecutar Backtesting")
 
     if run_backtest_button:
         if not selected_timeframe:
-            st.sidebar.error("❌ Debes seleccionar una temporalidad.")
+            st.error("❌ Debes seleccionar una temporalidad.")
         else:
             with st.spinner("Ejecutando backtesting..."):
                 start_datetime = datetime.combine(start_date, datetime.min.time())
@@ -694,7 +693,7 @@ with tab1:
 
         # 5. Tabla de trades
         st.subheader("📊 Registro de Operaciones")
-        if 'trades' in results:
+        if results.get('trades'):
             trades_df = pd.DataFrame(results['trades'])
             trades_df['entry_time'] = pd.to_datetime(trades_df['entry_time'])
             trades_df['exit_time'] = pd.to_datetime(trades_df['exit_time'])
@@ -712,6 +711,8 @@ with tab1:
             
             styled_df = trades_df.style.applymap(color_pnl, subset=['pnl'])
             st.dataframe(styled_df)
+        else:
+            st.info("El backtesting no genero ninguna operacion en el periodo seleccionado.")
 
         # 6. Estadísticas adicionales
         st.subheader("📊 Estadísticas Detalladas")
