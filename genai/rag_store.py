@@ -3,12 +3,13 @@
 articles for a given query using a local Chroma collection (no paid vector DB)."""
 
 import os
+import tempfile
 import chromadb
 from google import genai
 
 EMBED_MODEL = "models/gemini-embedding-001"
 COLLECTION_NAME = "crypto_news"
-PERSIST_DIR = os.environ.get("CHROMA_DATA_DIR", r"C:\venvs\trading_bot_btc_data\chroma_data")
+PERSIST_DIR = os.environ.get("CHROMA_DATA_DIR", os.path.join(tempfile.gettempdir(), "trading_bot_btc_chroma"))
 os.makedirs(PERSIST_DIR, exist_ok=True)
 
 

@@ -22,23 +22,23 @@ from dotenv import load_dotenv
 # Cargar variables de entorno
 load_dotenv()
 
-# Verificar ambiente
-is_production = os.getenv('ENVIRONMENT', 'development') == 'production'
-debug_mode = os.getenv('DEBUG', 'false').lower() == 'true'
+# En Streamlit Community Cloud los secretos configurados en el dashboard
+# llegan via st.secrets, no como variables de entorno reales. Los copiamos
+# a os.environ para que los modulos de genai/ (que leen os.environ
+# directamente) los vean igual que en desarrollo local con .env.
+for _key in ("GEMINI_API_KEY", "BINANCE_API_KEY", "BINANCE_API_SECRET", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"):
+    if not os.environ.get(_key):
+        try:
+            _val = st.secrets.get(_key)
+        except Exception:
+            _val = None
+        if _val:
+            os.environ[_key] = _val
 
-# Configuración de secretos en producción
-if is_production:
-    # Usar secretos de Streamlit en producción
-    BINANCE_API_KEY = st.secrets["BINANCE_API_KEY"]
-    BINANCE_API_SECRET = st.secrets["BINANCE_API_SECRET"]
-    TELEGRAM_BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN")
-    TELEGRAM_CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID")
-else:
-    # Usar variables de entorno en desarrollo
-    BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
-    BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET")
-    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-    TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
+BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 # Configuración de la página
 st.set_page_config(

@@ -4,7 +4,7 @@
 import os
 from google import genai
 
-MODEL = "gemini-flash-latest"
+MODEL = "gemini-flash-lite-latest"
 
 
 def _get_client():
