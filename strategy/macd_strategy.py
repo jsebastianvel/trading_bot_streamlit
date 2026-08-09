@@ -42,17 +42,8 @@ def check_macd_signal(df, timeframe=''):
         return 'hold', 0.0
     
     try:
-        # Calcular MACD
-        macd = ta.macd(df['close'], fast=12, slow=26, signal=9)
-        
-        # Renombrar columnas para mantener consistencia
-        macd = macd.rename(columns={
-            'MACD_12_26_9': 'MACD_12_26_9',
-            'MACDs_12_26_9': 'MACDs_12_26_9',
-            'MACDh_12_26_9': 'MACDh_12_26_9'
-        })
-        
-        # Agregar columnas al DataFrame original
+        # Calcular MACD usando pandas_ta
+        macd = df.ta.macd(close='close', fast=12, slow=26, signal=9)
         df['MACD_12_26_9'] = macd['MACD_12_26_9']
         df['MACDs_12_26_9'] = macd['MACDs_12_26_9']
         df['MACDh_12_26_9'] = macd['MACDh_12_26_9']
@@ -65,21 +56,21 @@ def check_macd_signal(df, timeframe=''):
         current_price = df['close'].iloc[-1]
         
         # Calcular umbral relativo al precio (usando porcentajes)
-        # Por ejemplo, para BTC a $50,000, un umbral de 0.001 sería $50
         price_threshold = current_price * 0.001  # 0.1% del precio actual
         
         # Calcular volatilidad usando ATR
-        df['TR'] = ta.true_range(df['high'], df['low'], df['close'])
-        atr = df['TR'].rolling(window=14).mean().iloc[-1]
-        volatility = atr / price_threshold  # Normalizar la volatilidad respecto al umbral
+        atr = df.ta.atr(high='high', low='low', close='close', length=14)
+        df['TR'] = atr
+        atr_value = df['TR'].iloc[-1]
+        volatility = atr_value / price_threshold  # Normalizar la volatilidad respecto al umbral
         
         # Calcular umbral dinámico basado en la volatilidad y timeframe
         base_threshold = calculate_threshold(timeframe)
         threshold = price_threshold * base_threshold * (1 + volatility)
         
         # Calcular tendencia usando EMA
-        ema_20 = ta.ema(df['close'], length=20).iloc[-1]
-        ema_50 = ta.ema(df['close'], length=50).iloc[-1]
+        ema_20 = df.ta.ema(close='close', length=20).iloc[-1]
+        ema_50 = df.ta.ema(close='close', length=50).iloc[-1]
         trend = 'up' if ema_20 > ema_50 else 'down'
         
         # Imprimir valores para debugging

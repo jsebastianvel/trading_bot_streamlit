@@ -9,7 +9,7 @@ from config import TIMEFRAMES, SYMBOL, SIGNAL_THRESHOLD
 from utils.api_data import get_price_data, get_orderbook_summary
 from strategy.macd_strategy import check_macd_signal
 from visual.macd_plot import plot_macd_chart
-from macd_utils import interpretar_macd
+from utils.macd_utils import interpretar_macd
 from utils.telegram_notifications import TelegramNotifier
 from dotenv import load_dotenv
 import os
@@ -35,7 +35,7 @@ def evaluate_multi_timeframe(symbol):
     resumen = []
 
     # Carpeta para guardar gráficas
-    output_dir = r"C:/Users/OMEN Laptop/Documents/proyectosdeprogramacion/trading_bot_btc/charts"
+    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "charts")
     os.makedirs(output_dir, exist_ok=True)
 
     try:

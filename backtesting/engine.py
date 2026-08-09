@@ -12,7 +12,7 @@ from utils.api_data import get_price_data
 from config import TIMEFRAMES, SIGNAL_WEIGHTS, SIGNAL_THRESHOLD
 from .metrics import calculate_statistics
 from risk_management.position_manager import PositionManager
-import ta
+import pandas_ta as ta
 
 class BacktestEngine:
     """
@@ -64,11 +64,11 @@ class BacktestEngine:
             
             if df is not None and not df.empty:
                 if len(df) >= 35:  # Verificar datos suficientes para MACD
-                    # Calcular MACD usando ta
-                    macd_indicator = ta.trend.MACD(close=df['close'], window_fast=12, window_slow=26, window_sign=9)
-                    df['MACD_12_26_9'] = macd_indicator.macd()
-                    df['MACDs_12_26_9'] = macd_indicator.macd_signal()
-                    df['MACDh_12_26_9'] = macd_indicator.macd_diff()
+                    # Calcular MACD usando pandas_ta
+                    macd = df.ta.macd(close='close', fast=12, slow=26, signal=9)
+                    df['MACD_12_26_9'] = macd['MACD_12_26_9']
+                    df['MACDs_12_26_9'] = macd['MACDs_12_26_9']
+                    df['MACDh_12_26_9'] = macd['MACDh_12_26_9']
                     data[tf] = df
                     print(f"✅ {len(df)} períodos cargados para {tf}")
                 else:

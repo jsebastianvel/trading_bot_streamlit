@@ -5,6 +5,7 @@ Aplicación Streamlit para visualizar resultados de backtesting
 
 import streamlit as st
 import pandas as pd
+import pandas_ta as ta
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots

@@ -14,8 +14,11 @@ from datetime import datetime
 def plot_macd_chart(df, timeframe='', output_path=None):
     try:
         df = df.copy()
-        macd = ta.macd(df['close'])
-        df = df.join(macd)
+        # Calcular MACD usando pandas_ta
+        macd = df.ta.macd(close='close', fast=12, slow=26, signal=9)
+        df['MACD_12_26_9'] = macd['MACD_12_26_9']
+        df['MACDs_12_26_9'] = macd['MACDs_12_26_9']
+        df['MACDh_12_26_9'] = macd['MACDh_12_26_9']
 
         # Crear figura con subplots
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), gridspec_kw={'height_ratios': [2, 1]})

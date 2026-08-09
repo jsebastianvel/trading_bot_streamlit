@@ -8,8 +8,11 @@ Created on Thu Apr 10 23:58:34 2025
 import pandas_ta as ta
 
 def interpretar_macd(df, tf):
-    macd = ta.macd(df['close'])
-    df = df.join(macd)
+    macd = df.ta.macd(close='close', fast=12, slow=26, signal=9)
+    df['MACD_12_26_9'] = macd['MACD_12_26_9']
+    df['MACDs_12_26_9'] = macd['MACDs_12_26_9']
+    df['MACDh_12_26_9'] = macd['MACDh_12_26_9']
+    
     latest = df.iloc[-1]
     
     hist = latest['MACDh_12_26_9']
