@@ -36,8 +36,8 @@ def check_macd_signal(df, timeframe=''):
     Returns:
         tuple: (señal, fuerza) donde señal puede ser 'buy', 'sell', 'valley_buy', 'top_sell' o 'hold'
     """
-    # Verificar que hay suficientes datos
-    if len(df) < 35:  # Necesitamos al menos 26 períodos para MACD + algunos más para señales
+    # Verificar que hay suficientes datos (EMA-50 es el indicador que mas pide: 50 periodos)
+    if len(df) < 50:
         print(f"\n⚠️ Insuficientes datos para calcular MACD ({len(df)} períodos)")
         return 'hold', 0.0
     
