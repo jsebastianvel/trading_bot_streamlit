@@ -169,6 +169,20 @@ def check_macd_signal_databricks(df, timeframe=''):
         return 'hold', 0.0
 
 
+# COMMAND ----------
+
+# Diagnostico: probar el acceso directo a Binance vs otros exchanges
+import ccxt
+for exch_name in ['binance', 'kraken', 'coinbase']:
+    try:
+        exch = getattr(ccxt, exch_name)()
+        ohlcv = exch.fetch_ohlcv('BTC/USDT', timeframe='4h', limit=5)
+        print(f'{exch_name}: OK, {len(ohlcv)} velas')
+    except Exception as e:
+        print(f'{exch_name}: FALLO -> {type(e).__name__}: {e}')
+
+# COMMAND ----------
+
 computed_at = datetime.now(timezone.utc)
 signal_rows = []
 for tf in TIMEFRAMES:
@@ -187,10 +201,13 @@ for tf in TIMEFRAMES:
     })
     print(f"{tf}: {signal} (fuerza {strength:.2f})")
 
-signals_pdf = pd.DataFrame(signal_rows)
-signals_df = spark.createDataFrame(signals_pdf)
-signals_df.write.mode("append").option("mergeSchema", "true").saveAsTable(SIGNALS_TABLE)
-print(f"Escritas {signals_df.count()} señales en {SIGNALS_TABLE}")
+if signal_rows:
+    signals_pdf = pd.DataFrame(signal_rows)
+    signals_df = spark.createDataFrame(signals_pdf)
+    signals_df.write.mode("append").option("mergeSchema", "true").saveAsTable(SIGNALS_TABLE)
+    print(f"Escritas {signals_df.count()} señales en {SIGNALS_TABLE}")
+else:
+    print("No se obtuvieron señales (sin datos de precio para ninguna temporalidad), no se escribe nada")
 
 # COMMAND ----------
 
