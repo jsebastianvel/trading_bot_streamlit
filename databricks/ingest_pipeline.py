@@ -173,13 +173,16 @@ def check_macd_signal_databricks(df, timeframe=''):
 
 # Diagnostico: probar el acceso directo a Binance vs otros exchanges
 import ccxt
+diag_results = []
 for exch_name in ['binance', 'kraken', 'coinbase']:
     try:
         exch = getattr(ccxt, exch_name)()
         ohlcv = exch.fetch_ohlcv('BTC/USDT', timeframe='4h', limit=5)
-        print(f'{exch_name}: OK, {len(ohlcv)} velas')
+        diag_results.append(f'{exch_name}: OK, {len(ohlcv)} velas')
     except Exception as e:
-        print(f'{exch_name}: FALLO -> {type(e).__name__}: {e}')
+        diag_results.append(f'{exch_name}: FALLO -> {type(e).__name__}: {e}')
+print(chr(10).join(diag_results))
+dbutils.notebook.exit(chr(10).join(diag_results))
 
 # COMMAND ----------
 
