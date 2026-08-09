@@ -48,39 +48,43 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Crear pestañas para diferentes secciones
-tab1, tab2, tab3 = st.tabs(["📊 Backtesting", "🤖 Trading en Vivo", "🧠 Agente IA"])
+# Selector de seccion (radio en vez de st.tabs porque necesitamos saber
+# desde Python cual esta activa, para mostrar el sidebar correcto)
+NAV_OPTIONS = ["📊 Backtesting", "🤖 Trading en Vivo", "🧠 Agente IA"]
+selected_view = st.radio("Seccion", NAV_OPTIONS, horizontal=True, label_visibility="collapsed")
+st.markdown("---")
 
 # Inicializar el estado de la sesión para el trader en vivo si no existe
 if 'live_trader' not in st.session_state:
     st.session_state.live_trader = None
     st.session_state.is_trading = False
 
-with tab2:
+if selected_view == "🤖 Trading en Vivo":
     st.title("🤖 Trading Bot - Trading en Vivo")
     
     # Sección de configuración
-    st.header("Configuración de Trading")
+    with st.sidebar:
+        st.header("Configuración de Trading")
     
-    # Selección de exchange y par
-    exchange = st.selectbox(
-        "Exchange",
-        ["Binance"],
-        index=0
-    )
+        # Selección de exchange y par
+        exchange = st.selectbox(
+            "Exchange",
+            ["Binance"],
+            index=0
+        )
     
-    symbol = st.selectbox(
-        "Par de Trading",
-        ["BTC/USDT", "ETH/USDT", "TAO/USDT"],
-        index=0
-    )
+        symbol = st.selectbox(
+            "Par de Trading",
+            ["BTC/USDT", "ETH/USDT", "TAO/USDT"],
+            index=0
+        )
     
-    # Configuración de API (oculta)
-    api_key = os.getenv('BINANCE_API_KEY', '')
-    api_secret = os.getenv('BINANCE_API_SECRET', '')
+        # Configuración de API (oculta)
+        api_key = os.getenv('BINANCE_API_KEY', '')
+        api_secret = os.getenv('BINANCE_API_SECRET', '')
     
-    if not api_key or not api_secret:
-        st.error("❌ No se encontraron las credenciales de API en las variables de entorno")
+        if not api_key or not api_secret:
+            st.error("❌ No se encontraron las credenciales de API en las variables de entorno")
     
     if api_key and api_secret:
         # Estado del bot y controles
@@ -168,7 +172,7 @@ with tab2:
 
 
 
-with tab3:
+if selected_view == "🧠 Agente IA":
     st.title("Agente IA - Analisis con RAG + LLM")
     st.markdown(
         """
@@ -211,59 +215,60 @@ with tab3:
             for n in brief["news"]:
                 st.markdown(f"- **[{n['source']}]** [{n['title']}]({n['link']})")
 
-with tab1:
+if selected_view == "📊 Backtesting":
     st.title("🤖 Trading Bot - Análisis de Backtesting")
 
     # Sidebar para configuración
-    st.header("Configuración de Backtesting")
+    with st.sidebar:
+        st.header("Configuración de Backtesting")
 
-    # Parámetros de backtesting
-    symbol = st.selectbox(
-        "Par de Trading",
-        ["BTC/USDT", "ETH/USDT", "TAO/USDT", "XRP/USDT", "SOL/USDT"],
-        index=0
-    )
-
-    # Selección de fechas
-    col1, col2 = st.columns(2)
-
-    with col1:
-        start_date = st.date_input(
-            "Fecha Inicial",
-            value=datetime.now().date() - timedelta(days=365),  # Un año por defecto
-            max_value=datetime.now().date()
+        # Parámetros de backtesting
+        symbol = st.selectbox(
+            "Par de Trading",
+            ["BTC/USDT", "ETH/USDT", "TAO/USDT", "XRP/USDT", "SOL/USDT"],
+            index=0
         )
 
-    with col2:
-        end_date = st.date_input(
-            "Fecha Final",
-            value=datetime.now().date(),
-            max_value=datetime.now().date()
+        # Selección de fechas
+        col1, col2 = st.columns(2)
+
+        with col1:
+            start_date = st.date_input(
+                "Fecha Inicial",
+                value=datetime.now().date() - timedelta(days=365),  # Un año por defecto
+                max_value=datetime.now().date()
+            )
+
+        with col2:
+            end_date = st.date_input(
+                "Fecha Final",
+                value=datetime.now().date(),
+                max_value=datetime.now().date()
+            )
+
+        # Validar que la fecha inicial sea anterior a la final
+        if start_date >= end_date:
+            st.error("❌ La fecha inicial debe ser anterior a la fecha final")
+            st.stop()
+
+        # Selección de temporalidad (una sola opción)
+        selected_timeframe = st.selectbox(
+            "Temporalidad a analizar",
+            list(TIMEFRAMES.keys()),
+            index=None,
+            help="Selecciona la temporalidad para el backtesting"
         )
 
-    # Validar que la fecha inicial sea anterior a la final
-    if start_date >= end_date:
-        st.error("❌ La fecha inicial debe ser anterior a la fecha final")
-        st.stop()
+        initial_capital = st.number_input(
+            "Capital Inicial ($)",
+            min_value=100,
+            max_value=100000,
+            value=1000,
+            step=100
+        )
 
-    # Selección de temporalidad (una sola opción)
-    selected_timeframe = st.selectbox(
-        "Temporalidad a analizar",
-        list(TIMEFRAMES.keys()),
-        index=None,
-        help="Selecciona la temporalidad para el backtesting"
-    )
-
-    initial_capital = st.number_input(
-        "Capital Inicial ($)",
-        min_value=100,
-        max_value=100000,
-        value=1000,
-        step=100
-    )
-
-    # Botón para ejecutar backtesting
-    run_backtest_button = st.button("Ejecutar Backtesting")
+        # Botón para ejecutar backtesting
+        run_backtest_button = st.button("Ejecutar Backtesting")
 
     if run_backtest_button:
         if not selected_timeframe:
