@@ -12,7 +12,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-def get_price_data(symbol, timeframe='15m', start_date=None, end_date=None, limit=1000):
+def get_price_data(symbol, timeframe='15m', start_date=None, end_date=None, limit=1000, exchange='binance'):
     """
     Obtiene datos históricos de precios
     
@@ -24,10 +24,10 @@ def get_price_data(symbol, timeframe='15m', start_date=None, end_date=None, limi
         limit: Número máximo de velas a obtener
     """
     try:
-        binance = ccxt.binance()
+        exchange_client = getattr(ccxt, exchange)()
         
         # Asegurarse de que el símbolo esté en el formato correcto para Binance
-        if '/' in symbol:
+        if exchange == 'binance' and '/' in symbol:
             symbol = symbol.replace('/', '')
         
         # Convertir fechas a timestamp en milisegundos
@@ -60,7 +60,7 @@ def get_price_data(symbol, timeframe='15m', start_date=None, end_date=None, limi
         while True:
             try:
                 # Hacer la petición
-                ohlcv = binance.fetch_ohlcv(symbol, timeframe=timeframe, since=current_ts, limit=limit)
+                ohlcv = exchange_client.fetch_ohlcv(symbol, timeframe=timeframe, since=current_ts, limit=limit)
                 
                 if not ohlcv:
                     break

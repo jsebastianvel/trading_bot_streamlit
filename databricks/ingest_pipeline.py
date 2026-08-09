@@ -11,14 +11,18 @@
 # MAGIC `config.TIMEFRAMES`/`SYMBOL`, `genai.news_fetcher.fetch_latest_news`)
 # MAGIC en vez de duplicar esa logica.
 # MAGIC
-# MAGIC **Nota sobre la senal MACD:** la app local (`strategy/macd_strategy.py`)
-# MAGIC usa `pandas_ta`, pero ese paquete (el fork mantenido pandas-ta.dev, unica
-# MAGIC version publicada en PyPI hoy) requiere Python >=3.12, mientras que el
-# MAGIC runtime de Databricks usa Python 3.11 -- no hay ninguna version de
-# MAGIC `pandas_ta` instalable aqui. Por eso esta version usa la libreria `ta`
-# MAGIC (sin esa restriccion) para calcular MACD/EMA/ATR, replicando exactamente
-# MAGIC los mismos umbrales y logica de decision que `check_macd_signal` (incluido
-# MAGIC el minimo de 50 periodos para que la EMA-50 sea valida).
+# MAGIC **Notas de compatibilidad con Databricks (encontradas en desarrollo):**
+# MAGIC - `pandas_ta` (el fork mantenido pandas-ta.dev, unica version en PyPI hoy)
+# MAGIC   requiere Python >=3.12, pero el runtime de Databricks usa Python 3.11 --
+# MAGIC   no hay ninguna version instalable aqui. Se usa la libreria `ta` en su
+# MAGIC   lugar, replicando exactamente los mismos umbrales y logica de decision
+# MAGIC   que `strategy.macd_strategy.check_macd_signal`.
+# MAGIC - Binance devuelve HTTP 451 ("Service unavailable from a restricted
+# MAGIC   location") desde la red de Databricks Free Edition -- es un bloqueo de
+# MAGIC   Binance a rangos de IP de nube (AWS/GCP/Azure), no un problema de este
+# MAGIC   codigo. Se usa Kraken en su lugar (`get_price_data(..., exchange='kraken')`,
+# MAGIC   parametro agregado a `utils/api_data.py` sin cambiar el default 'binance'
+# MAGIC   que sigue usando la app de Streamlit local).
 
 # COMMAND ----------
 
@@ -58,6 +62,7 @@ CATALOG = "workspace"
 SCHEMA = "trading_bot"
 NEWS_TABLE = f"{CATALOG}.{SCHEMA}.crypto_news"
 SIGNALS_TABLE = f"{CATALOG}.{SCHEMA}.trading_signals"
+PRICE_EXCHANGE = "kraken"
 
 GEMINI_API_KEY = dbutils.secrets.get(scope="trading_bot_btc", key="gemini_api_key")
 
@@ -103,19 +108,23 @@ for a in articles:
         "ingested_at": ingested_at,
     })
 
-news_pdf = pd.DataFrame(news_rows)
-news_df = spark.createDataFrame(news_pdf)
-news_df.write.mode("append").option("mergeSchema", "true").saveAsTable(NEWS_TABLE)
-print(f"Escritas {news_df.count()} noticias en {NEWS_TABLE}")
+if news_rows:
+    news_pdf = pd.DataFrame(news_rows)
+    news_df = spark.createDataFrame(news_pdf)
+    news_df.write.mode("append").option("mergeSchema", "true").saveAsTable(NEWS_TABLE)
+    print(f"Escritas {news_df.count()} noticias en {NEWS_TABLE}")
+else:
+    print("No se obtuvieron noticias, no se escribe nada")
 
 # COMMAND ----------
 
 # MAGIC %md
 # MAGIC ## 3. Senales MACD multi-timeframe
 # MAGIC
-# MAGIC Reutiliza `get_price_data`/`TIMEFRAMES`/`SYMBOL` del repo real. El calculo
-# MAGIC del indicador usa la libreria `ta` (ver nota arriba) pero replica
-# MAGIC exactamente la misma logica de `strategy/macd_strategy.py`.
+# MAGIC Reutiliza `get_price_data`/`TIMEFRAMES`/`SYMBOL` del repo real (con
+# MAGIC `exchange='kraken'`, ver nota de compatibilidad arriba). El calculo del
+# MAGIC indicador usa la libreria `ta` pero replica exactamente la misma logica
+# MAGIC de `strategy/macd_strategy.py`.
 
 # COMMAND ----------
 
@@ -169,27 +178,10 @@ def check_macd_signal_databricks(df, timeframe=''):
         return 'hold', 0.0
 
 
-# COMMAND ----------
-
-# Diagnostico: probar el acceso directo a Binance vs otros exchanges
-import ccxt
-diag_results = []
-for exch_name in ['binance', 'kraken', 'coinbase']:
-    try:
-        exch = getattr(ccxt, exch_name)()
-        ohlcv = exch.fetch_ohlcv('BTC/USDT', timeframe='4h', limit=5)
-        diag_results.append(f'{exch_name}: OK, {len(ohlcv)} velas')
-    except Exception as e:
-        diag_results.append(f'{exch_name}: FALLO -> {type(e).__name__}: {e}')
-print(chr(10).join(diag_results))
-dbutils.notebook.exit(chr(10).join(diag_results))
-
-# COMMAND ----------
-
 computed_at = datetime.now(timezone.utc)
 signal_rows = []
 for tf in TIMEFRAMES:
-    df = get_price_data(SYMBOL, tf, limit=200)
+    df = get_price_data(SYMBOL, tf, limit=200, exchange=PRICE_EXCHANGE)
     if df is None or df.empty:
         print(f"{tf}: sin datos, se omite")
         continue
@@ -219,8 +211,14 @@ else:
 
 # COMMAND ----------
 
-display(spark.sql(f"SELECT source, title, ingested_at FROM {NEWS_TABLE} ORDER BY ingested_at DESC LIMIT 5"))
+if spark.catalog.tableExists(NEWS_TABLE):
+    display(spark.sql(f"SELECT source, title, ingested_at FROM {NEWS_TABLE} ORDER BY ingested_at DESC LIMIT 5"))
+else:
+    print(f"{NEWS_TABLE} no existe todavia")
 
 # COMMAND ----------
 
-display(spark.sql(f"SELECT timeframe, signal, strength, price, computed_at FROM {SIGNALS_TABLE} ORDER BY computed_at DESC LIMIT 10"))
+if spark.catalog.tableExists(SIGNALS_TABLE):
+    display(spark.sql(f"SELECT timeframe, signal, strength, price, computed_at FROM {SIGNALS_TABLE} ORDER BY computed_at DESC LIMIT 10"))
+else:
+    print(f"{SIGNALS_TABLE} no existe todavia")
