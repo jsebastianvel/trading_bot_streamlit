@@ -7,17 +7,25 @@
 # MAGIC
 # MAGIC Este notebook corre dentro de un Databricks Repo conectado al repo
 # MAGIC publico de GitHub `jsebastianvel/trading_bot_streamlit`, e importa
-# MAGIC directamente el codigo real del repo (`strategy`, `utils`, `config`,
-# MAGIC `genai.news_fetcher`) en vez de duplicar la logica -- es la misma
-# MAGIC estrategia MACD+EMA que corre en la app de Streamlit local, incluyendo
-# MAGIC el fix del minimo de 50 periodos para EMA-50.
+# MAGIC directamente el codigo real del repo (`utils.api_data.get_price_data`,
+# MAGIC `config.TIMEFRAMES`/`SYMBOL`, `genai.news_fetcher.fetch_latest_news`)
+# MAGIC en vez de duplicar esa logica.
+# MAGIC
+# MAGIC **Nota sobre la senal MACD:** la app local (`strategy/macd_strategy.py`)
+# MAGIC usa `pandas_ta`, pero ese paquete (el fork mantenido pandas-ta.dev, unica
+# MAGIC version publicada en PyPI hoy) requiere Python >=3.12, mientras que el
+# MAGIC runtime de Databricks usa Python 3.11 -- no hay ninguna version de
+# MAGIC `pandas_ta` instalable aqui. Por eso esta version usa la libreria `ta`
+# MAGIC (sin esa restriccion) para calcular MACD/EMA/ATR, replicando exactamente
+# MAGIC los mismos umbrales y logica de decision que `check_macd_signal` (incluido
+# MAGIC el minimo de 50 periodos para que la EMA-50 sea valida).
 
 # COMMAND ----------
 
 import subprocess, sys
 
 result = subprocess.run(
-    [sys.executable, "-m", "pip", "install", "feedparser", "ccxt", "pandas_ta==0.3.14b0", "google-genai"],
+    [sys.executable, "-m", "pip", "install", "feedparser", "ccxt", "ta", "google-genai"],
     capture_output=True, text=True
 )
 print(result.stdout[-4000:])
@@ -36,13 +44,14 @@ import os
 from datetime import datetime, timezone
 import pandas as pd
 from google import genai
+from ta.trend import MACD, EMAIndicator
+from ta.volatility import AverageTrueRange
 
 REPO_ROOT = "/Workspace/Repos/jsebastian.velasco@gmail.com/trading_bot_streamlit"
 sys.path.append(REPO_ROOT)
 
 from config import TIMEFRAMES, SYMBOL
 from utils.api_data import get_price_data
-from strategy.macd_strategy import check_macd_signal
 from genai.news_fetcher import fetch_latest_news
 
 CATALOG = "workspace"
@@ -102,9 +111,63 @@ print(f"Escritas {news_df.count()} noticias en {NEWS_TABLE}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 3. Senales MACD multi-timeframe (reutiliza `strategy.macd_strategy` y `utils.api_data`)
+# MAGIC ## 3. Senales MACD multi-timeframe
+# MAGIC
+# MAGIC Reutiliza `get_price_data`/`TIMEFRAMES`/`SYMBOL` del repo real. El calculo
+# MAGIC del indicador usa la libreria `ta` (ver nota arriba) pero replica
+# MAGIC exactamente la misma logica de `strategy/macd_strategy.py`.
 
 # COMMAND ----------
+
+def calculate_threshold(timeframe):
+    tf_factors = {'15m': 0.5, '30m': 0.6, '1h': 0.7, '4h': 0.8, '1d': 0.9, '3d': 1.0}
+    return 0.8 * tf_factors.get(timeframe, 0.7)
+
+
+def check_macd_signal_databricks(df, timeframe=''):
+    """Misma logica que strategy.macd_strategy.check_macd_signal, calculada
+    con la libreria `ta` en vez de `pandas_ta` (ver nota de compatibilidad
+    de Python arriba)."""
+    if len(df) < 50:
+        return 'hold', 0.0
+    try:
+        macd_ind = MACD(close=df['close'], window_fast=12, window_slow=26, window_sign=9)
+        last_macd = macd_ind.macd().iloc[-1]
+        last_signal = macd_ind.macd_signal().iloc[-1]
+        hist = macd_ind.macd_diff()
+        last_hist = hist.iloc[-1]
+        prev_hist = hist.iloc[-2] if len(df) > 1 else 0
+        current_price = df['close'].iloc[-1]
+
+        price_threshold = current_price * 0.001
+
+        atr_ind = AverageTrueRange(high=df['high'], low=df['low'], close=df['close'], window=14)
+        atr_value = atr_ind.average_true_range().iloc[-1]
+        volatility = atr_value / price_threshold
+
+        threshold = price_threshold * calculate_threshold(timeframe) * (1 + volatility)
+
+        ema_20 = EMAIndicator(close=df['close'], window=20).ema_indicator().iloc[-1]
+        ema_50 = EMAIndicator(close=df['close'], window=50).ema_indicator().iloc[-1]
+        trend = 'up' if ema_20 > ema_50 else 'down'
+
+        signal_strength = min((abs(last_hist) / threshold) * (1 + volatility), 1.0)
+
+        if last_hist > 0 and prev_hist <= 0:
+            if abs(last_hist) > threshold and trend == 'up':
+                return 'valley_buy', signal_strength
+            elif trend == 'up':
+                return 'buy', signal_strength
+        elif last_hist < 0 and prev_hist >= 0:
+            if abs(last_hist) > threshold and trend == 'down':
+                return 'top_sell', signal_strength
+            elif trend == 'down':
+                return 'sell', signal_strength
+        return 'hold', 0.0
+    except Exception as e:
+        print(f"Error calculando señal para {timeframe}: {e}")
+        return 'hold', 0.0
+
 
 computed_at = datetime.now(timezone.utc)
 signal_rows = []
@@ -113,7 +176,7 @@ for tf in TIMEFRAMES:
     if df is None or df.empty:
         print(f"{tf}: sin datos, se omite")
         continue
-    signal, strength = check_macd_signal(df, tf)
+    signal, strength = check_macd_signal_databricks(df, tf)
     signal_rows.append({
         "symbol": SYMBOL,
         "timeframe": tf,
