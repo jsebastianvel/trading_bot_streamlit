@@ -17,7 +17,7 @@
 import subprocess, sys
 
 result = subprocess.run(
-    [sys.executable, "-m", "pip", "install", "feedparser", "ccxt", "pandas_ta", "google-genai"],
+    [sys.executable, "-m", "pip", "install", "feedparser", "ccxt", "pandas_ta==0.3.14b0", "google-genai"],
     capture_output=True, text=True
 )
 print(result.stdout[-4000:])
