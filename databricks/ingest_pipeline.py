@@ -14,7 +14,16 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install feedparser ccxt pandas_ta google-genai --quiet
+import subprocess, sys
+
+result = subprocess.run(
+    [sys.executable, "-m", "pip", "install", "feedparser", "ccxt", "pandas_ta", "google-genai"],
+    capture_output=True, text=True
+)
+print(result.stdout[-4000:])
+print(result.stderr[-4000:])
+if result.returncode != 0:
+    dbutils.notebook.exit(f"PIP INSTALL FAILED (rc={result.returncode}): {result.stderr[-2000:]}")
 
 # COMMAND ----------
 
