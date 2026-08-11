@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 def get_price_data(symbol, timeframe='15m', start_date=None, end_date=None, limit=1000, exchange='kraken'):
     """
     Obtiene datos históricos de precios
-    
+
     Args:
         symbol: Par de trading (ej. 'BTC/USDT')
         timeframe: Temporalidad ('15m', '30m', '1h', '4h', '1d', '3d')
@@ -25,15 +25,23 @@ def get_price_data(symbol, timeframe='15m', start_date=None, end_date=None, limi
     """
     try:
         exchange_client = getattr(ccxt, exchange)()
-        
+
         # Asegurarse de que el símbolo esté en el formato correcto para Binance
         if exchange == 'binance' and '/' in symbol:
             symbol = symbol.replace('/', '')
-        
+
+        # Algunos exchanges (p. ej. Kraken) no exponen el timeframe '3d'
+        # directamente. En ese caso pedimos velas '1d' y las agregamos
+        # (resample) a barras de 3 días en vez de fallar.
+        fetch_timeframe = timeframe
+        resample_to_3d = timeframe == '3d' and '3d' not in exchange_client.timeframes
+        if resample_to_3d:
+            fetch_timeframe = '1d'
+
         # Convertir fechas a timestamp en milisegundos
         start_ts = int(start_date.timestamp() * 1000) if start_date else None
         end_ts = int(end_date.timestamp() * 1000) if end_date else None
-        
+
         # Calcular el número de velas necesarias basado en el timeframe
         if start_ts and end_ts:
             # Mapeo de timeframes a minutos
@@ -42,65 +50,78 @@ def get_price_data(symbol, timeframe='15m', start_date=None, end_date=None, limi
                 '1h': 60, '2h': 120, '4h': 240, '6h': 360, '8h': 480,
                 '12h': 720, '1d': 1440, '3d': 4320, '1w': 10080
             }
-            
-            # Obtener minutos del timeframe
-            tf_minutes = tf_map.get(timeframe, 60)
-            
+
+            # Obtener minutos de la temporalidad realmente solicitada al exchange
+            tf_minutes = tf_map.get(fetch_timeframe, 60)
+
             # Calcular número de velas necesarias
             time_diff = (end_ts - start_ts) / (1000 * 60)  # diferencia en minutos
             num_candles = int(time_diff / tf_minutes) + 2  # +2 para asegurar cobertura
-            
+
             # Ajustar limit si es necesario
             limit = min(num_candles, 1000)  # Binance tiene un límite de 1000
-        
+        elif resample_to_3d:
+            # Sin rango de fechas explícito: pedimos ~3x más velas diarias
+            # para poder agruparlas en barras de 3 días.
+            limit = min(limit * 3, 1000)
+
         # Obtener datos históricos
         all_data = []
         current_ts = start_ts
-        
+
         while True:
             try:
                 # Hacer la petición
-                ohlcv = exchange_client.fetch_ohlcv(symbol, timeframe=timeframe, since=current_ts, limit=limit)
-                
+                ohlcv = exchange_client.fetch_ohlcv(symbol, timeframe=fetch_timeframe, since=current_ts, limit=limit)
+
                 if not ohlcv:
                     break
-                    
+
                 all_data.extend(ohlcv)
-                
+
                 # Verificar si hemos llegado al final
                 last_ts = ohlcv[-1][0]
                 if end_ts and last_ts >= end_ts:
                     break
                 if len(ohlcv) < limit:
                     break
-                    
+
                 current_ts = last_ts + 1
-                
+
             except Exception as e:
-                print(f"Error al obtener datos para {symbol} en {timeframe}: {e}")
+                print(f"Error al obtener datos para {symbol} en {fetch_timeframe}: {e}")
                 break
-        
+
         if not all_data:
             print(f"No se pudieron obtener datos para {symbol} en el período especificado")
             return pd.DataFrame()
-        
+
         # Convertir a DataFrame
         df = pd.DataFrame(all_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df = df.set_index('timestamp')
-        
+
         # Filtrar por fechas y eliminar duplicados
         if start_date:
             df = df[df.index >= pd.Timestamp(start_date)]
         if end_date:
             df = df[df.index <= pd.Timestamp(end_date)]
-        
+
         # Eliminar duplicados y ordenar por índice
         df = df[~df.index.duplicated(keep='first')]
         df = df.sort_index()
-        
+
+        if resample_to_3d and not df.empty:
+            df = df.resample('3D').agg({
+                'open': 'first',
+                'high': 'max',
+                'low': 'min',
+                'close': 'last',
+                'volume': 'sum'
+            }).dropna()
+
         return df
-        
+
     except Exception as e:
         print(f"Error en get_price_data: {e}")
         return pd.DataFrame()
@@ -130,14 +151,14 @@ def get_orderbook_summary(symbol, depth=10):
     # Calcular porcentajes del total
     bids_total = bids_df['amount'].sum()
     asks_total = asks_df['amount'].sum()
-    
+
     bids_df['pct_of_total'] = (bids_df['amount'] / bids_total * 100)
     asks_df['pct_of_total'] = (asks_df['amount'] / asks_total * 100)
 
     # Calcular distribución acumulativa
     bids_df['cumulative_btc'] = bids_df['amount'].cumsum()
     asks_df['cumulative_btc'] = asks_df['amount'].cumsum()
-    
+
     bids_df['cumulative_usd'] = bids_df['total_usd'].cumsum()
     asks_df['cumulative_usd'] = asks_df['total_usd'].cumsum()
 

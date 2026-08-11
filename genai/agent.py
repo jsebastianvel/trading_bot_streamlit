@@ -32,7 +32,7 @@ def _aggregate_signals(symbol):
     return peso_buy, peso_sell, resumen
 
 
-def generate_market_brief(symbol=SYMBOL):
+def generate_market_brief(symbol=SYMBOL, lang="es"):
     """Combines technical MACD signals with RAG-retrieved news to produce
     an LLM-generated, explained trading recommendation."""
     try:
@@ -54,6 +54,23 @@ def generate_market_brief(symbol=SYMBOL):
     news_lines = "\n".join(f"- ({n['source']}) {n['title']}" for n in news) or "No hay noticias indexadas todavia."
     signals_lines = "\n".join(resumen)
 
+    if lang == "en":
+        instructions = (
+            "Write a short market brief (max 150 words) in English that:\n"
+            "1. Explains in plain language what the technical analysis shows.\n"
+            "2. States whether recent news reinforces or contradicts the technical signal.\n"
+            "3. Gives a clear final recommendation (LONG, SHORT, or WAIT) with reasoning.\n"
+            "Do not invent prices or data that are not in the context above."
+        )
+    else:
+        instructions = (
+            "Escribe un market brief breve (maximo 150 palabras) en espanol que:\n"
+            "1. Explique en lenguaje sencillo que dice el analisis tecnico.\n"
+            "2. Indique si las noticias recientes refuerzan o contradicen la senal tecnica.\n"
+            "3. De una recomendacion final clara (LONG, SHORT o WAIT) con el razonamiento.\n"
+            "No inventes precios ni datos que no esten en el contexto de arriba."
+        )
+
     prompt = f"""Eres un analista financiero cuantitativo. Tienes dos fuentes de informacion sobre {symbol}:
 
 SENALES TECNICAS (indicador MACD por temporalidad):
@@ -65,11 +82,7 @@ Decision preliminar del sistema (basada solo en pesos tecnicos): {decision}
 NOTICIAS RECIENTES RELEVANTES:
 {news_lines}
 
-Escribe un "market brief" breve (maximo 150 palabras) en espanol que:
-1. Explique en lenguaje sencillo que dice el analisis tecnico.
-2. Indique si las noticias recientes refuerzan o contradicen la senal tecnica.
-3. De una recomendacion final clara (LONG, SHORT o WAIT) con el razonamiento.
-No inventes precios ni datos que no esten en el contexto de arriba."""
+{instructions}"""
 
     explanation = generate_text(prompt)
 

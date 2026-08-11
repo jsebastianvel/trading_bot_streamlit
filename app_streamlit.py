@@ -18,6 +18,7 @@ from config import TIMEFRAMES
 from trading.live_trader import LiveTrader
 import ccxt
 from dotenv import load_dotenv
+from i18n import t
 
 # Cargar variables de entorno
 load_dotenv()
@@ -48,10 +49,31 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Idioma de la interfaz (persistido en la sesión)
+if "lang" not in st.session_state:
+    st.session_state.lang = "es"
+
+_lang_options = {"Español": "es", "English": "en"}
+_lang_labels = list(_lang_options.keys())
+_current_label = "Español" if st.session_state.lang == "es" else "English"
+_selected_label = st.radio(
+    t("lang_selector_label", st.session_state.lang),
+    _lang_labels,
+    index=_lang_labels.index(_current_label),
+    horizontal=True,
+    label_visibility="collapsed",
+)
+st.session_state.lang = _lang_options[_selected_label]
+lang = st.session_state.lang
+
 # Selector de seccion (radio en vez de st.tabs porque necesitamos saber
 # desde Python cual esta activa, para mostrar el sidebar correcto)
-NAV_OPTIONS = ["📊 Backtesting", "🤖 Trading en Vivo", "🧠 Agente IA"]
-selected_view = st.radio("Seccion", NAV_OPTIONS, horizontal=True, label_visibility="collapsed")
+NAV_KEYS = ["backtesting", "live_trading", "ai_agent"]
+NAV_LABELS = [t(f"nav_{k}", lang) for k in NAV_KEYS]
+_selected_nav_label = st.radio(
+    t("nav_label", lang), NAV_LABELS, horizontal=True, label_visibility="collapsed"
+)
+selected_view = NAV_KEYS[NAV_LABELS.index(_selected_nav_label)]
 st.markdown("---")
 
 # Inicializar el estado de la sesión para el trader en vivo si no existe
@@ -59,40 +81,41 @@ if 'live_trader' not in st.session_state:
     st.session_state.live_trader = None
     st.session_state.is_trading = False
 
-if selected_view == "🤖 Trading en Vivo":
-    st.title("🤖 Trading Bot - Trading en Vivo")
-    
+if selected_view == "live_trading":
+    st.title(t("live_title", lang))
+    st.info(t("live_disclaimer", lang))
+
     # Sección de configuración
     with st.sidebar:
-        st.header("Configuración de Trading")
-    
+        st.header(t("live_sidebar_header", lang))
+
         # Selección de exchange y par
         exchange = st.selectbox(
-            "Exchange",
+            t("live_exchange_label", lang),
             ["Binance"],
             index=0
         )
-    
+
         symbol = st.selectbox(
-            "Par de Trading",
-            ["BTC/USDT", "ETH/USDT", "TAO/USDT"],
+            t("live_pair_label", lang),
+            ["BTC/USDT", "ETH/USDT"],
             index=0
         )
-    
+
         # Configuración de API (oculta)
         api_key = os.getenv('BINANCE_API_KEY', '')
         api_secret = os.getenv('BINANCE_API_SECRET', '')
-    
+
         if not api_key or not api_secret:
-            st.error("❌ No se encontraron las credenciales de API en las variables de entorno")
-    
+            st.error(t("live_no_credentials", lang))
+
     if api_key and api_secret:
         # Estado del bot y controles
         col1, col2, col3 = st.columns(3)
-    
+
         with col1:
             if st.session_state.live_trader is None:
-                if st.button("🟢 Iniciar Bot"):
+                if st.button(t("live_start_bot", lang)):
                     try:
                         # Inicializar exchange
                         exchange_config = {
@@ -101,131 +124,113 @@ if selected_view == "🤖 Trading en Vivo":
                             'enableRateLimit': True
                         }
                         exchange_client = ccxt.binance(exchange_config)
-                    
+
                         # Crear instancia del trader
                         st.session_state.live_trader = LiveTrader(
                             exchange_client=exchange_client,
                             symbol=symbol
                         )
                         st.session_state.live_trader.start()
-                        st.success("✅ Bot iniciado exitosamente")
+                        st.success(t("live_bot_started", lang))
                         st.rerun()
                     except Exception as e:
-                        st.error(f"❌ Error al iniciar el bot: {str(e)}")
+                        st.error(t("live_start_error", lang, error=str(e)))
             else:
-                if st.button("🔴 Detener Bot"):
+                if st.button(t("live_stop_bot", lang)):
                     try:
                         st.session_state.live_trader.stop()
                         st.session_state.live_trader = None
                         st.session_state.is_trading = False
-                        st.success("✅ Bot detenido exitosamente")
+                        st.success(t("live_bot_stopped", lang))
                         st.rerun()
                     except Exception as e:
-                        st.error(f"❌ Error al detener el bot: {str(e)}")
-    
+                        st.error(t("live_stop_error", lang, error=str(e)))
+
         with col2:
             if st.session_state.live_trader is not None:
                 if not st.session_state.is_trading:
-                    if st.button("✅ Activar Trading"):
+                    if st.button(t("live_enable_trading", lang)):
                         st.session_state.live_trader.enable_trading()
                         st.session_state.is_trading = True
-                        st.success("✅ Trading activado")
+                        st.success(t("live_trading_enabled", lang))
                         st.rerun()
                 else:
-                    if st.button("⛔ Desactivar Trading"):
+                    if st.button(t("live_disable_trading", lang)):
                         st.session_state.live_trader.disable_trading()
                         st.session_state.is_trading = False
-                        st.success("⛔ Trading desactivado")
+                        st.success(t("live_trading_disabled", lang))
                         st.rerun()
-    
+
         with col3:
             # Estado actual
             if st.session_state.live_trader is not None:
                 st.metric(
-                    "Estado del Bot",
-                    "🟢 Activo" if st.session_state.live_trader.is_running else "🔴 Detenido"
+                    t("live_bot_status", lang),
+                    t("live_status_active", lang) if st.session_state.live_trader.is_running else t("live_status_stopped", lang)
                 )
                 st.metric(
-                    "Trading Automático",
-                    "✅ Activado" if st.session_state.is_trading else "⛔ Desactivado"
+                    t("live_auto_trading", lang),
+                    t("live_auto_enabled", lang) if st.session_state.is_trading else t("live_auto_disabled", lang)
                 )
             else:
-                st.metric("Estado del Bot", "🔴 Detenido")
-                st.metric("Trading Automático", "⛔ Desactivado")
-    
+                st.metric(t("live_bot_status", lang), t("live_status_stopped", lang))
+                st.metric(t("live_auto_trading", lang), t("live_auto_disabled", lang))
+
         # Información y advertencias
-        st.info("""
-        ℹ️ **Información del Trading en Vivo**
-        - El bot analiza el mercado cada minuto
-        - Las señales se generan según la estrategia MACD multi-timeframe
-        - El trading automático ejecutará operaciones solo cuando esté activado
-        - Todas las operaciones se notifican por Telegram
-        """)
-    
-        st.warning("""
-        ⚠️ **Advertencias**
-        - Asegúrate de tener suficiente saldo en tu cuenta
-        - El bot opera con un máximo del 5% del capital por operación
-        - Las operaciones automáticas pueden generar pérdidas
-        - Monitorea regularmente el rendimiento del bot
-        """)
+        st.info(t("live_info_block", lang))
+
+        st.warning(t("live_warning_block", lang))
 
 
 
-if selected_view == "🧠 Agente IA":
-    st.title("Agente IA - Analisis con RAG + LLM")
-    st.markdown(
-        """
-        Este agente combina la señal técnica MACD multi-temporalidad con noticias
-        recientes de cripto (recuperadas vía RAG) y usa un LLM (Gemini) para
-        generar una explicación en lenguaje natural y una recomendación final.
-        """
-    )
+if selected_view == "ai_agent":
+    st.title(t("agent_title", lang))
+    st.markdown(t("agent_description", lang))
 
-    if st.button("Generar análisis del agente", type="primary"):
-        with st.spinner("Consultando precios, noticias y generando análisis..."):
+    if st.button(t("agent_generate_button", lang), type="primary"):
+        with st.spinner(t("agent_spinner", lang)):
             try:
                 from genai.agent import generate_market_brief
-                st.session_state.agent_brief = generate_market_brief()
+                st.session_state.agent_brief = generate_market_brief(lang=lang)
                 st.session_state.agent_error = None
             except Exception as e:
                 st.session_state.agent_error = str(e)
 
     if st.session_state.get("agent_error"):
-        st.error(f"Error generando el análisis: {st.session_state.agent_error}")
+        st.error(t("agent_error", lang, error=st.session_state.agent_error))
 
     if st.session_state.get("agent_brief"):
         brief = st.session_state.agent_brief
 
         decision_icon = {"LONG": "🟢", "SHORT": "🔴", "WAIT": "🟡"}.get(brief["decision"], "")
-        st.metric("Recomendación", f"{decision_icon} {brief['decision']}")
+        st.metric(t("agent_recommendation", lang), f"{decision_icon} {brief['decision']}")
 
         col1, col2 = st.columns(2)
-        col1.metric("Peso Compra", f"{brief['peso_buy']:.2f}")
-        col2.metric("Peso Venta", f"{brief['peso_sell']:.2f}")
+        col1.metric(t("agent_buy_weight", lang), f"{brief['peso_buy']:.2f}")
+        col2.metric(t("agent_sell_weight", lang), f"{brief['peso_sell']:.2f}")
 
-        st.subheader("Market Brief (generado por IA)")
+        st.subheader(t("agent_brief_subheader", lang))
         st.write(brief["explanation"])
 
-        with st.expander("Señales técnicas por temporalidad"):
+        with st.expander(t("agent_signals_expander", lang)):
             for s in brief["signals"]:
                 st.text(s)
 
-        with st.expander(f"Noticias usadas para el contexto ({len(brief['news'])})"):
+        with st.expander(t("agent_news_expander", lang, count=len(brief['news']))):
             for n in brief["news"]:
                 st.markdown(f"- **[{n['source']}]** [{n['title']}]({n['link']})")
 
-if selected_view == "📊 Backtesting":
-    st.title("🤖 Trading Bot - Análisis de Backtesting")
+if selected_view == "backtesting":
+    st.title(t("bt_title", lang))
 
     # Sidebar para configuración
     with st.sidebar:
-        st.header("Configuración de Backtesting")
+        st.header(t("bt_sidebar_header", lang))
 
         # Parámetros de backtesting
         symbol = st.selectbox(
-            "Par de Trading",
-            ["BTC/USDT", "ETH/USDT", "TAO/USDT", "XRP/USDT", "SOL/USDT"],
+            t("bt_pair_label", lang),
+            ["BTC/USDT", "ETH/USDT", "XRP/USDT", "SOL/USDT"],
             index=0
         )
 
@@ -234,33 +239,33 @@ if selected_view == "📊 Backtesting":
 
         with col1:
             start_date = st.date_input(
-                "Fecha Inicial",
+                t("bt_start_date", lang),
                 value=datetime.now().date() - timedelta(days=365),  # Un año por defecto
                 max_value=datetime.now().date()
             )
 
         with col2:
             end_date = st.date_input(
-                "Fecha Final",
+                t("bt_end_date", lang),
                 value=datetime.now().date(),
                 max_value=datetime.now().date()
             )
 
         # Validar que la fecha inicial sea anterior a la final
         if start_date >= end_date:
-            st.error("❌ La fecha inicial debe ser anterior a la fecha final")
+            st.error(t("bt_date_order_error", lang))
             st.stop()
 
         # Selección de temporalidad (una sola opción)
         selected_timeframe = st.selectbox(
-            "Temporalidad a analizar",
+            t("bt_timeframe_label", lang),
             list(TIMEFRAMES.keys()),
             index=None,
-            help="Selecciona la temporalidad para el backtesting"
+            help=t("bt_timeframe_help", lang)
         )
 
         initial_capital = st.number_input(
-            "Capital Inicial ($)",
+            t("bt_capital_label", lang),
             min_value=100,
             max_value=100000,
             value=1000,
@@ -268,16 +273,16 @@ if selected_view == "📊 Backtesting":
         )
 
         # Botón para ejecutar backtesting
-        run_backtest_button = st.button("Ejecutar Backtesting")
+        run_backtest_button = st.button(t("bt_run_button", lang))
 
     if run_backtest_button:
         if not selected_timeframe:
-            st.error("❌ Debes seleccionar una temporalidad.")
+            st.error(t("bt_timeframe_required", lang))
         else:
-            with st.spinner("Ejecutando backtesting..."):
+            with st.spinner(t("bt_running_spinner", lang)):
                 start_datetime = datetime.combine(start_date, datetime.min.time())
                 end_datetime = datetime.combine(end_date, datetime.max.time())
-                
+
                 results = run_backtest(
                     symbol=symbol,
                     start_date=start_datetime,
@@ -285,7 +290,7 @@ if selected_view == "📊 Backtesting":
                     initial_capital=initial_capital,
                     timeframes=[selected_timeframe]  # Lista con un solo elemento
                 )
-                st.success("✅ Backtesting completado exitosamente!")
+                st.success(t("bt_completed", lang))
                 st.session_state.last_run = datetime.now()
                 st.session_state.show_results = True
                 st.rerun()
@@ -295,7 +300,7 @@ if selected_view == "📊 Backtesting":
         st.session_state.show_results = False
 
     if not st.session_state.show_results:
-        st.info("👈 Configura los parámetros en el panel lateral y presiona 'Ejecutar Backtesting' para comenzar.")
+        st.info(t("bt_configure_hint", lang))
         st.stop()
 
     # Cargar resultados de backtesting
@@ -307,7 +312,7 @@ if selected_view == "📊 Backtesting":
         result_files.extend(glob.glob(os.path.join(results_dir, "*.json")))
 
     if not result_files:
-        st.warning("No hay resultados de backtesting disponibles.")
+        st.warning(t("bt_no_results", lang))
         st.stop()
 
     # Ordenar archivos por fecha de modificación (más reciente primero)
@@ -315,13 +320,13 @@ if selected_view == "📊 Backtesting":
 
     # Usar el archivo más reciente automáticamente
     selected_file = result_files[0]
-        
+
     try:
         with open(selected_file, 'r') as f:
             results = json.load(f)
-            
+
         if not results:
-            st.error("El archivo de resultados está vacío.")
+            st.error(t("bt_empty_file", lang))
             st.stop()
 
         # Convertir fechas y timestamps
@@ -335,7 +340,7 @@ if selected_view == "📊 Backtesting":
                 else:
                     return pd.to_datetime(timestamp_str)
             except Exception as e:
-                st.warning(f"Error al parsear timestamp {timestamp_str}: {str(e)}")
+                st.warning(t("bt_timestamp_parse_warning", lang, timestamp=timestamp_str, error=str(e)))
                 return None
 
         # Convertir fechas de inicio y fin
@@ -345,26 +350,27 @@ if selected_view == "📊 Backtesting":
             results['end_date'] = safe_parse_timestamp(results['end_date'])
 
         # 1. Mostrar información del backtest
-        st.info(f"""
-        **Detalles del Backtest:**
-        - Par: {results['symbol']}
-        - Período: {results['start_date'].strftime('%Y-%m-%d %H:%M')} a {results['end_date'].strftime('%Y-%m-%d %H:%M')}
-        - Timeframes: {', '.join(results['timeframes'])}
-        """)
+        st.info(t(
+            "bt_details_block", lang,
+            symbol=results['symbol'],
+            start=results['start_date'].strftime('%Y-%m-%d %H:%M'),
+            end=results['end_date'].strftime('%Y-%m-%d %H:%M'),
+            timeframes=', '.join(results['timeframes']),
+        ))
 
         # 2. Métricas principales
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("Retorno Total", f"{results['total_return']:.2f}%")
+            st.metric(t("bt_metric_total_return", lang), f"{results['total_return']:.2f}%")
         with col2:
-            st.metric("Win Rate", f"{results['win_rate']:.2f}%")
+            st.metric(t("bt_metric_win_rate", lang), f"{results['win_rate']:.2f}%")
         with col3:
-            st.metric("Factor de Beneficio", f"{results['profit_factor']:.2f}")
+            st.metric(t("bt_metric_profit_factor", lang), f"{results['profit_factor']:.2f}")
         with col4:
-            st.metric("Máximo Drawdown", f"{results['max_drawdown']:.2f}%")
+            st.metric(t("bt_metric_max_drawdown", lang), f"{results['max_drawdown']:.2f}%")
 
         # 3. Gráfica de evolución del capital
-        st.subheader("📈 Evolución del Capital")
+        st.subheader(t("bt_capital_evolution_subheader", lang))
         if 'balance_history' in results and results['balance_history']:
             # Convertir el historial de balance a DataFrame
             balance_data = []
@@ -377,17 +383,17 @@ if selected_view == "📊 Backtesting":
                             'balance': float(balance)
                         })
                 except Exception as e:
-                    st.warning(f"Error al procesar timestamp del balance: {str(e)}")
+                    st.warning(t("bt_balance_timestamp_warning", lang, error=str(e)))
                     continue
-            
+
             # Crear DataFrame y ordenar por timestamp
             balance_df = pd.DataFrame(balance_data)
             if not balance_df.empty:
                 balance_df.set_index('timestamp', inplace=True)
                 balance_df.sort_index(inplace=True)
-                
+
                 # Gráfica de evolución del capital
-                fig = make_subplots(rows=2, cols=1, 
+                fig = make_subplots(rows=2, cols=1,
                                   shared_xaxes=True,
                                   vertical_spacing=0.05,
                                   row_heights=[0.7, 0.3])
@@ -397,7 +403,7 @@ if selected_view == "📊 Backtesting":
                     go.Scatter(
                         x=balance_df.index,
                         y=balance_df['balance'],
-                        name='Capital',
+                        name=t("bt_capital_trace_name", lang),
                         line=dict(color='blue'),
                         fill='tozeroy'
                     ),
@@ -409,7 +415,7 @@ if selected_view == "📊 Backtesting":
                     y=results['initial_capital'],
                     line_dash="dash",
                     line_color="gray",
-                    annotation_text="Capital Inicial",
+                    annotation_text=t("bt_initial_capital_annotation", lang),
                     row=1, col=1
                 )
 
@@ -423,27 +429,27 @@ if selected_view == "📊 Backtesting":
                                 if timestamp is not None:
                                     if isinstance(dd_value, dict):
                                         dd_value = dd_value.get('drawdown', 0)
-                                    
+
                                     drawdown_data.append({
                                         'timestamp': timestamp,
                                         'drawdown': float(dd_value)
                                     })
                             except Exception as e:
-                                st.warning(f"Error al procesar timestamp del drawdown: {str(e)}")
+                                st.warning(t("bt_drawdown_timestamp_warning", lang, error=str(e)))
                                 continue
-                        
+
                         # Crear DataFrame de drawdown y ordenar
                         dd_df = pd.DataFrame(drawdown_data)
                         if not dd_df.empty:
                             dd_df.set_index('timestamp', inplace=True)
                             dd_df.sort_index(inplace=True)
-                            
+
                             # Agregar gráfica de drawdown
                             fig.add_trace(
                                 go.Scatter(
                                     x=dd_df.index,
                                     y=dd_df['drawdown'],
-                                    name='Drawdown',
+                                    name=t("bt_drawdown_trace_name", lang),
                                     fill='tozeroy',
                                     line=dict(color='red')
                                 ),
@@ -451,16 +457,16 @@ if selected_view == "📊 Backtesting":
                             )
 
                     except Exception as e:
-                        st.error(f"Error al procesar drawdown: {str(e)}")
+                        st.error(t("bt_drawdown_process_error", lang, error=str(e)))
 
                 # Actualizar layout
                 fig.update_layout(
                     height=600,
-                    title_text="Evolución del Capital y Drawdown",
+                    title_text=t("bt_capital_chart_title", lang),
                     showlegend=True,
-                    xaxis2_title="Fecha",
-                    yaxis_title="Capital ($)",
-                    yaxis2_title="Drawdown (%)",
+                    xaxis2_title=t("bt_date_axis", lang),
+                    yaxis_title=t("bt_capital_axis", lang),
+                    yaxis2_title=t("bt_drawdown_axis", lang),
                     yaxis=dict(
                         tickformat='$,.2f',
                         range=[
@@ -479,12 +485,12 @@ if selected_view == "📊 Backtesting":
 
                 st.plotly_chart(fig, use_container_width=True)
             else:
-                st.warning("No hay datos válidos de evolución del capital")
+                st.warning(t("bt_no_valid_capital_data", lang))
         else:
-            st.warning("No hay datos de evolución del capital disponibles")
+            st.warning(t("bt_no_capital_data", lang))
 
         # 4. Gráfico de análisis técnico
-        st.subheader("📈 Análisis Técnico")
+        st.subheader(t("bt_technical_analysis_subheader", lang))
         if 'price_data' in results:
             try:
                 # Convertir price_data a DataFrame
@@ -494,14 +500,14 @@ if selected_view == "📊 Backtesting":
                     if timestamp is not None:
                         data['timestamp'] = timestamp
                         price_data_list.append(data)
-                
+
                 price_df = pd.DataFrame(price_data_list)
                 if not price_df.empty:
                     price_df.set_index('timestamp', inplace=True)
                     price_df.sort_index(inplace=True)
 
                     # Crear gráfico con subplots
-                    fig = make_subplots(rows=2, cols=1, 
+                    fig = make_subplots(rows=2, cols=1,
                                       shared_xaxes=True,
                                       vertical_spacing=0.05,
                                       row_heights=[0.7, 0.3])
@@ -514,7 +520,7 @@ if selected_view == "📊 Backtesting":
                             high=price_df['high'],
                             low=price_df['low'],
                             close=price_df['close'],
-                            name="Precio"
+                            name=t("bt_price_trace_name", lang)
                         ),
                         row=1, col=1
                     )
@@ -527,7 +533,7 @@ if selected_view == "📊 Backtesting":
                     for trade in results['trades']:
                         entry_time = pd.to_datetime(trade['entry_time'])
                         exit_time = pd.to_datetime(trade['exit_time'])
-                        
+
                         if trade['type'] == 'long':
                             long_entries.append({
                                 'time': entry_time,
@@ -542,7 +548,7 @@ if selected_view == "📊 Backtesting":
                                 'stop_loss': trade.get('stop_loss_price'),
                                 'take_profit': trade.get('take_profit_price')
                             })
-                        
+
                         exits.append({
                             'time': exit_time,
                             'price': trade['exit_price']
@@ -677,10 +683,10 @@ if selected_view == "📊 Backtesting":
                     # Actualizar layout
                     fig.update_layout(
                         height=800,
-                        title_text="Análisis Técnico",
+                        title_text=t("bt_technical_chart_title", lang),
                         showlegend=True,
                         xaxis_rangeslider_visible=False,
-                        yaxis=dict(title="Precio", tickformat='$,.2f'),
+                        yaxis=dict(title=t("bt_price_axis", lang), tickformat='$,.2f'),
                         yaxis2=dict(title="MACD"),
                         legend=dict(
                             yanchor="top",
@@ -692,51 +698,50 @@ if selected_view == "📊 Backtesting":
 
                     st.plotly_chart(fig, use_container_width=True)
                 else:
-                    st.warning("No hay datos válidos para el gráfico de análisis técnico")
+                    st.warning(t("bt_no_valid_technical_data", lang))
             except Exception as e:
-                st.error(f"Error al procesar price_data: {str(e)}")
+                st.error(t("bt_price_data_error", lang, error=str(e)))
 
         # 5. Tabla de trades
-        st.subheader("📊 Registro de Operaciones")
+        st.subheader(t("bt_trades_subheader", lang))
         if results.get('trades'):
             trades_df = pd.DataFrame(results['trades'])
             trades_df['entry_time'] = pd.to_datetime(trades_df['entry_time'])
             trades_df['exit_time'] = pd.to_datetime(trades_df['exit_time'])
             trades_df['duration'] = trades_df['exit_time'] - trades_df['entry_time']
-            
+
             # Formatear la tabla
             trades_df['pnl'] = trades_df['pnl'].round(2)
             trades_df['entry_price'] = trades_df['entry_price'].round(2)
             trades_df['exit_price'] = trades_df['exit_price'].round(2)
-            
+
             # Agregar colores según P&L
             def color_pnl(val):
                 color = 'green' if val > 0 else 'red'
                 return f'color: {color}'
-            
+
             styled_df = trades_df.style.map(color_pnl, subset=['pnl'])
             st.dataframe(styled_df)
         else:
-            st.info("El backtesting no genero ninguna operacion en el periodo seleccionado.")
+            st.info(t("bt_no_trades", lang))
 
         # 6. Estadísticas adicionales
-        st.subheader("📊 Estadísticas Detalladas")
+        st.subheader(t("bt_stats_subheader", lang))
         col1, col2 = st.columns(2)
-        
+
         with col1:
-            st.write("**Métricas de Trading**")
-            st.write(f"- Número total de trades: {results['total_trades']}")
-            st.write(f"- Trades ganadores: {results['winning_trades']}")
-            st.write(f"- Trades perdedores: {results['losing_trades']}")
-            st.write(f"- Ratio ganador/perdedor: {results['win_rate']:.2f}%")
-            
+            st.write(t("bt_trading_metrics_header", lang))
+            st.write(t("bt_total_trades", lang, value=results['total_trades']))
+            st.write(t("bt_winning_trades", lang, value=results['winning_trades']))
+            st.write(t("bt_losing_trades", lang, value=results['losing_trades']))
+            st.write(t("bt_win_loss_ratio", lang, value=results['win_rate']))
+
         with col2:
-            st.write("**Métricas de Capital**")
-            st.write(f"- Capital inicial: ${results['initial_capital']:,.2f}")
-            st.write(f"- Capital final: ${results['final_capital']:,.2f}")
-            st.write(f"- Retorno total: {results['total_return']:.2f}%")
-            st.write(f"- Máximo drawdown: {results['max_drawdown']:.2f}%")
+            st.write(t("bt_capital_metrics_header", lang))
+            st.write(t("bt_initial_capital_line", lang, value=results['initial_capital']))
+            st.write(t("bt_final_capital_line", lang, value=results['final_capital']))
+            st.write(t("bt_total_return_line", lang, value=results['total_return']))
+            st.write(t("bt_max_drawdown_line", lang, value=results['max_drawdown']))
 
     except Exception as e:
-        st.error(f"Error al cargar los resultados: {e}")
-
+        st.error(t("bt_load_error", lang, error=str(e)))
