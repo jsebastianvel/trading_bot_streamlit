@@ -12,7 +12,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
-def get_price_data(symbol, timeframe='15m', start_date=None, end_date=None, limit=1000, exchange='binance'):
+def get_price_data(symbol, timeframe='15m', start_date=None, end_date=None, limit=1000, exchange='kraken'):
     """
     Obtiene datos históricos de precios
     
