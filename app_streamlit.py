@@ -51,7 +51,7 @@ st.set_page_config(
 
 # Idioma de la interfaz (persistido en la sesión)
 if "lang" not in st.session_state:
-    st.session_state.lang = "es"
+    st.session_state.lang = "en"
 
 _lang_options = {"Español": "es", "English": "en"}
 _lang_labels = list(_lang_options.keys())
